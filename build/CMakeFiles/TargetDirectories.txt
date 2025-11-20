@@ -1,0 +1,4 @@
+/home/xavier/Documents/VisionArtificial/Prueba/build/CMakeFiles/visor_medico.dir
+/home/xavier/Documents/VisionArtificial/Prueba/build/CMakeFiles/edit_cache.dir
+/home/xavier/Documents/VisionArtificial/Prueba/build/CMakeFiles/rebuild_cache.dir
+/home/xavier/Documents/VisionArtificial/Prueba/build/CMakeFiles/visor_medico_autogen.dir
