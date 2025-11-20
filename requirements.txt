@@ -1,0 +1,13 @@
+Requisitos para la API y el procesamiento de imágenes
+
+fastapi
+uvicorn[standard] # Servidor asíncrono
+
+Librerías de procesamiento de imágenes
+
+Usaremos SimpleITK en Python como una alternativa más amigable a ITK/C++ para la lectura de NIfTI
+
+SimpleITK
+opencv-python
+numpy
+pydicom # Para un manejo más robusto de DICOM (aunque NIfTI es más común con SimpleITK)
