@@ -18,9 +18,11 @@ Aplicar:
     
 - Binarización
     - umbral
+
 - Detección de bordes
 
 - contraste
+
 - identificación de regiones
 
 - reducción de ruido

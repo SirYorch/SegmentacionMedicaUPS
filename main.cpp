@@ -24,6 +24,10 @@ int ksizeTrack = 3;       // representará kernel = 2*ksizeTrack + 1
 int sigmaTrack = 10;      // representará sigma = sigmaTrack / 10.0
 int umbralMin = 0;
 int umbralMax = 255;
+int cx = 100;
+int cy = 100;
+int radioX = 50;
+int radioY = 50;
 
 int kernelSize = 3;
 
@@ -183,6 +187,23 @@ Rect btnEq(10, 60, 120, 40);
 
 // Estado de botones (si quieres alternar)
 
+
+Mat maskCircle(Mat &img, int cx, int cy, int rx, int ry) {
+    Mat mask = Mat::zeros(img.rows, img.cols, CV_8UC1);
+
+    // 1. Dibujar círculo blanco = zona visible
+    ellipse(mask, cv::Point(cx, cy), cv::Size(rx, ry), 0, 0, 360, Scalar(255), FILLED);
+
+    // 2. Crear salida blanca (color blanco completo)
+    Mat salida(img.rows, img.cols, img.type(), Scalar(255));
+
+    // 3. Copiar dentro del círculo la imagen original
+    img.copyTo(salida, mask);
+
+    return salida;
+}
+
+
 void onMouse(int event, int x, int y, int flags, void*) {
     if (event == EVENT_LBUTTONDOWN) {
         if (btnCLAHE.contains(cv::Point(x, y))) {
@@ -195,6 +216,22 @@ void onMouse(int event, int x, int y, int flags, void*) {
         }
         
     }
+
+    // Redibujar controles para feedback visual (opcional pero recomendado)
+        Mat panel(160, 300, CV_8UC3, Scalar(50, 50, 50));
+        
+        // Color del botón según estado
+        Scalar colorClahe = clahe ? Scalar(100, 255, 100) : Scalar(200, 200, 200);
+        Scalar colorEq = eq ? Scalar(100, 255, 100) : Scalar(200, 200, 200);
+
+        rectangle(panel, btnCLAHE, colorClahe, FILLED);
+        putText(panel, "CLAHE", cv::Point(25, 35), FONT_HERSHEY_SIMPLEX, 0.7, Scalar(0,0,0));
+
+        rectangle(panel, btnEq, colorEq, FILLED);
+        putText(panel, "EQ HIST", cv::Point(35, 85), FONT_HERSHEY_SIMPLEX, 0.7, Scalar(0,0,0));
+
+        imshow("Controles", panel);
+
 }
 Mat open(Mat imagen, int kernelSize){
     // Retorna proceso de apertura, erosion y dilatacion
@@ -219,6 +256,75 @@ Mat close(Mat imagen, int kernelSize){
     return salida;
 }
 
+
+
+Mat defineLungs(Mat imagen){ 
+    // este método ocupa las características obtenidas para resaltar solamente los pulmones en una imagen aislada
+    int cxdf = 253;
+    int cydf = 264;
+    int radioXdf = 210;
+    int radioYdf = 147;
+    int mindf  = 0 ;
+    int maxdf = 58;
+    int kerneldf = 9 ;
+    double sigmadf =  sigmaTrack / 10.0;;
+    int ksizedf = 3;
+
+    if (currentSlice < 127){
+        imagen = maskCircle(imagen, cxdf, cydf, radioXdf, radioYdf);
+        GaussianBlur(imagen, imagen, cv::Size(kerneldf, kerneldf), sigmadf);
+    
+        // Umbralización
+        imagen = Umbrilize(imagen, mindf , maxdf);
+        imagen = open(imagen, kernelSize);
+
+    } else {
+        imagen = Mat::zeros(imagen.rows, imagen.cols, CV_8UC1);
+    }
+
+    return imagen;
+}
+
+
+Mat mergeMasks(Mat &imgOriginal, Mat &maskLung, float alpha = 0.3) {
+    Mat imgColor;
+
+    // Convertir a BGR si la original es gris
+    if (imgOriginal.channels() == 1)
+        cvtColor(imgOriginal, imgColor, COLOR_GRAY2BGR);
+    else
+        imgColor = imgOriginal.clone();
+
+    // Crear capa verde del mismo tamaño
+    Mat greenLayer(imgOriginal.rows, imgOriginal.cols, CV_8UC3, Scalar(0, 255, 0));
+
+    // Crear salida inicial como copia
+    Mat output = imgColor.clone();
+
+    // Aplicar overlay SOLO donde la máscara es 255
+    for (int i = 0; i < imgOriginal.rows; i++) {
+        for (int j = 0; j < imgOriginal.cols; j++) {
+
+            if (maskLung.at<uchar>(i, j) == 255) {
+
+                // output = (1 - alpha) * original + alpha * green
+                output.at<Vec3b>(i, j)[0] =
+                    (1.0 - alpha) * imgColor.at<Vec3b>(i, j)[0] +
+                    alpha * greenLayer.at<Vec3b>(i, j)[0];
+
+                output.at<Vec3b>(i, j)[1] =
+                    (1.0 - alpha) * imgColor.at<Vec3b>(i, j)[1] +
+                    alpha * greenLayer.at<Vec3b>(i, j)[1];
+
+                output.at<Vec3b>(i, j)[2] =
+                    (1.0 - alpha) * imgColor.at<Vec3b>(i, j)[2] +
+                    alpha * greenLayer.at<Vec3b>(i, j)[2];
+            }
+        }
+    }
+
+    return output;
+}
 
 
 
@@ -267,6 +373,11 @@ int main() {
 
     createTrackbar("Min", "Controles", &umbralMin, 255);  // límite arbitrari
     createTrackbar("Max", "Controles", &umbralMax, 255); // sigma max = 10.0
+
+    createTrackbar("Centro X", "Controles", &cx, 512);
+    createTrackbar("Centro Y", "Controles", &cy, 512);
+    createTrackbar("Radio X", "Controles", &radioX, 512);
+    createTrackbar("Radio Y", "Controles", &radioY, 512);
     
     Mat panel(160, 300, CV_8UC3, Scalar(50, 50, 50));
 
@@ -284,14 +395,32 @@ int main() {
     rectangle(panel, btnEq, Scalar(200, 200, 200), FILLED);
     putText(panel, "BLUR", cv::Point(35, 85), FONT_HERSHEY_SIMPLEX, 0.7, Scalar(0,0,0));
 
-    imshow("Controles", panel);
     
     
+    // Con pruebas llegamos a la idea de que el BLUR aplicado solo sirve para los pulmones
+    // Los huesos se ven mucho mejor con la ecualización y luego BLUR, 
+
+
+
+    // Los pulmones se ven mucho mejor solo con apertura
+
+
+
+    /// para aislar los pulmonesel circulo usamos. slices 0-127
+    // circulo en 253,264
+    // RadioX de 210
+    // radioY de 247
+
+imshow("Controles", panel);
 
 
    while (true) {
         Mat imagen = imgs[currentSlice].clone();
         Mat imagenOriginal = imgs[currentSlice].clone();
+
+        if (currentSlice < 127){
+            imagen = maskCircle(imagen, cx, cy, radioX, radioY);
+        }
 
         int kernel = 2 * ksizeTrack + 1;
         double sigma = sigmaTrack / 10.0;
@@ -312,6 +441,9 @@ int main() {
         // cout << umbralMin << " " << umbralMax;
         Mat salidaUmbral = Umbrilize(imagen, umbralMin , umbralMax);
 
+        if(kernelSize == 0 ){
+            kernelSize = 1;
+        }
         Mat Apertura = open(salidaUmbral, kernelSize);
 
         Mat Close = close(salidaUmbral, kernelSize);
@@ -320,9 +452,10 @@ int main() {
         Mat clap = open(Close, kernelSize);
 
 
+
         // Mostrar
         imshow("Visor", salidaUmbral);
-        imshow("VisorFiltro", imagen);
+        imshow("VisorFiltro", imagenOriginal);
         imshow("Blured", imagenBlur);
         imshow("Apertura", Apertura);
         imshow("ap+cl", apcl);
@@ -330,17 +463,51 @@ int main() {
         imshow("Close", Close);
 
         int k = waitKey(30);
+        if (k == 27) {
+            destroyWindow("Visor");
+            destroyWindow("VisorFiltro");
+            destroyWindow("Blured");
+            destroyWindow("Apertura");
+            destroyWindow("Close");
+            destroyWindow("ap+cl");
+            destroyWindow("cl+ap");
+            break;
+        }; 
+    }
+
+
+// destroyAllWindows();
+
+//////////  toda esta parte va a estar despues comentada, me sirve solo el for con las neuvas ventanas
+
+namedWindow("Pulmones", WINDOW_AUTOSIZE);
+namedWindow("Completa", WINDOW_AUTOSIZE);
+
+imshow("Controles", panel);
+
+
+moveWindow("Pulmones",810, 0);
+moveWindow("Completa",300, 0);
+
+while (true) {
+        Mat Original = imgs[currentSlice].clone();
+
+        Mat pulmones = imgs[currentSlice].clone();
+
+        pulmones = defineLungs(pulmones);
+
+        
+
+        Mat completa = mergeMasks(Original, pulmones);
+
+        imshow("Pulmones", pulmones);
+        imshow("Completa", completa);
+
+        int k = waitKey(30);
         if (k == 27) break; 
     }
 
 
-
-    // Con pruebas llegamos a la idea de que el BLUR aplicado solo sirve para los pulmones
-    // Los huesos se ven mucho mejor con la ecualización y luego BLUR, 
-
-
-
-    // Los pulmones se ven mucho mejor solo con apertura
 
 
     return 0;
