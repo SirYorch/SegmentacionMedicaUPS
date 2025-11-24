@@ -57,10 +57,10 @@ RM = /usr/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /home/xavier/Documents/VisionArtificial/Prueba
+CMAKE_SOURCE_DIR = /home/siryorch/Documents/SegmentacionMedicaUPS
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /home/xavier/Documents/VisionArtificial/Prueba/build
+CMAKE_BINARY_DIR = /home/siryorch/Documents/SegmentacionMedicaUPS/build
 
 #=============================================================================
 # Targets provided globally by CMake.
@@ -87,9 +87,9 @@ rebuild_cache/fast: rebuild_cache
 
 # The main all target
 all: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/xavier/Documents/VisionArtificial/Prueba/build/CMakeFiles /home/xavier/Documents/VisionArtificial/Prueba/build//CMakeFiles/progress.marks
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/siryorch/Documents/SegmentacionMedicaUPS/build/CMakeFiles /home/siryorch/Documents/SegmentacionMedicaUPS/build//CMakeFiles/progress.marks
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 all
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/xavier/Documents/VisionArtificial/Prueba/build/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/siryorch/Documents/SegmentacionMedicaUPS/build/CMakeFiles 0
 .PHONY : all
 
 # The main clean target
@@ -117,37 +117,37 @@ depend:
 .PHONY : depend
 
 #=============================================================================
-# Target rules for targets named visor_medico
+# Target rules for targets named medicalSegmentation
 
 # Build rule for target.
-visor_medico: cmake_check_build_system
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 visor_medico
-.PHONY : visor_medico
+medicalSegmentation: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 medicalSegmentation
+.PHONY : medicalSegmentation
 
 # fast build rule for target.
-visor_medico/fast:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/visor_medico.dir/build.make CMakeFiles/visor_medico.dir/build
-.PHONY : visor_medico/fast
+medicalSegmentation/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/medicalSegmentation.dir/build.make CMakeFiles/medicalSegmentation.dir/build
+.PHONY : medicalSegmentation/fast
 
 #=============================================================================
-# Target rules for targets named visor_medico_autogen
+# Target rules for targets named medicalSegmentation_autogen
 
 # Build rule for target.
-visor_medico_autogen: cmake_check_build_system
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 visor_medico_autogen
-.PHONY : visor_medico_autogen
+medicalSegmentation_autogen: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 medicalSegmentation_autogen
+.PHONY : medicalSegmentation_autogen
 
 # fast build rule for target.
-visor_medico_autogen/fast:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/visor_medico_autogen.dir/build.make CMakeFiles/visor_medico_autogen.dir/build
-.PHONY : visor_medico_autogen/fast
+medicalSegmentation_autogen/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/medicalSegmentation_autogen.dir/build.make CMakeFiles/medicalSegmentation_autogen.dir/build
+.PHONY : medicalSegmentation_autogen/fast
 
 MedicalImageApp.o: MedicalImageApp.cpp.o
 .PHONY : MedicalImageApp.o
 
 # target to build an object file
 MedicalImageApp.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/visor_medico.dir/build.make CMakeFiles/visor_medico.dir/MedicalImageApp.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/medicalSegmentation.dir/build.make CMakeFiles/medicalSegmentation.dir/MedicalImageApp.cpp.o
 .PHONY : MedicalImageApp.cpp.o
 
 MedicalImageApp.i: MedicalImageApp.cpp.i
@@ -155,7 +155,7 @@ MedicalImageApp.i: MedicalImageApp.cpp.i
 
 # target to preprocess a source file
 MedicalImageApp.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/visor_medico.dir/build.make CMakeFiles/visor_medico.dir/MedicalImageApp.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/medicalSegmentation.dir/build.make CMakeFiles/medicalSegmentation.dir/MedicalImageApp.cpp.i
 .PHONY : MedicalImageApp.cpp.i
 
 MedicalImageApp.s: MedicalImageApp.cpp.s
@@ -163,7 +163,7 @@ MedicalImageApp.s: MedicalImageApp.cpp.s
 
 # target to generate assembly for a file
 MedicalImageApp.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/visor_medico.dir/build.make CMakeFiles/visor_medico.dir/MedicalImageApp.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/medicalSegmentation.dir/build.make CMakeFiles/medicalSegmentation.dir/MedicalImageApp.cpp.s
 .PHONY : MedicalImageApp.cpp.s
 
 MedicalImageProcessor.o: MedicalImageProcessor.cpp.o
@@ -171,7 +171,7 @@ MedicalImageProcessor.o: MedicalImageProcessor.cpp.o
 
 # target to build an object file
 MedicalImageProcessor.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/visor_medico.dir/build.make CMakeFiles/visor_medico.dir/MedicalImageProcessor.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/medicalSegmentation.dir/build.make CMakeFiles/medicalSegmentation.dir/MedicalImageProcessor.cpp.o
 .PHONY : MedicalImageProcessor.cpp.o
 
 MedicalImageProcessor.i: MedicalImageProcessor.cpp.i
@@ -179,7 +179,7 @@ MedicalImageProcessor.i: MedicalImageProcessor.cpp.i
 
 # target to preprocess a source file
 MedicalImageProcessor.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/visor_medico.dir/build.make CMakeFiles/visor_medico.dir/MedicalImageProcessor.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/medicalSegmentation.dir/build.make CMakeFiles/medicalSegmentation.dir/MedicalImageProcessor.cpp.i
 .PHONY : MedicalImageProcessor.cpp.i
 
 MedicalImageProcessor.s: MedicalImageProcessor.cpp.s
@@ -187,7 +187,7 @@ MedicalImageProcessor.s: MedicalImageProcessor.cpp.s
 
 # target to generate assembly for a file
 MedicalImageProcessor.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/visor_medico.dir/build.make CMakeFiles/visor_medico.dir/MedicalImageProcessor.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/medicalSegmentation.dir/build.make CMakeFiles/medicalSegmentation.dir/MedicalImageProcessor.cpp.s
 .PHONY : MedicalImageProcessor.cpp.s
 
 main.o: main.cpp.o
@@ -195,7 +195,7 @@ main.o: main.cpp.o
 
 # target to build an object file
 main.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/visor_medico.dir/build.make CMakeFiles/visor_medico.dir/main.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/medicalSegmentation.dir/build.make CMakeFiles/medicalSegmentation.dir/main.cpp.o
 .PHONY : main.cpp.o
 
 main.i: main.cpp.i
@@ -203,7 +203,7 @@ main.i: main.cpp.i
 
 # target to preprocess a source file
 main.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/visor_medico.dir/build.make CMakeFiles/visor_medico.dir/main.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/medicalSegmentation.dir/build.make CMakeFiles/medicalSegmentation.dir/main.cpp.i
 .PHONY : main.cpp.i
 
 main.s: main.cpp.s
@@ -211,32 +211,32 @@ main.s: main.cpp.s
 
 # target to generate assembly for a file
 main.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/visor_medico.dir/build.make CMakeFiles/visor_medico.dir/main.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/medicalSegmentation.dir/build.make CMakeFiles/medicalSegmentation.dir/main.cpp.s
 .PHONY : main.cpp.s
 
-visor_medico_autogen/mocs_compilation.o: visor_medico_autogen/mocs_compilation.cpp.o
-.PHONY : visor_medico_autogen/mocs_compilation.o
+medicalSegmentation_autogen/mocs_compilation.o: medicalSegmentation_autogen/mocs_compilation.cpp.o
+.PHONY : medicalSegmentation_autogen/mocs_compilation.o
 
 # target to build an object file
-visor_medico_autogen/mocs_compilation.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/visor_medico.dir/build.make CMakeFiles/visor_medico.dir/visor_medico_autogen/mocs_compilation.cpp.o
-.PHONY : visor_medico_autogen/mocs_compilation.cpp.o
+medicalSegmentation_autogen/mocs_compilation.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/medicalSegmentation.dir/build.make CMakeFiles/medicalSegmentation.dir/medicalSegmentation_autogen/mocs_compilation.cpp.o
+.PHONY : medicalSegmentation_autogen/mocs_compilation.cpp.o
 
-visor_medico_autogen/mocs_compilation.i: visor_medico_autogen/mocs_compilation.cpp.i
-.PHONY : visor_medico_autogen/mocs_compilation.i
+medicalSegmentation_autogen/mocs_compilation.i: medicalSegmentation_autogen/mocs_compilation.cpp.i
+.PHONY : medicalSegmentation_autogen/mocs_compilation.i
 
 # target to preprocess a source file
-visor_medico_autogen/mocs_compilation.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/visor_medico.dir/build.make CMakeFiles/visor_medico.dir/visor_medico_autogen/mocs_compilation.cpp.i
-.PHONY : visor_medico_autogen/mocs_compilation.cpp.i
+medicalSegmentation_autogen/mocs_compilation.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/medicalSegmentation.dir/build.make CMakeFiles/medicalSegmentation.dir/medicalSegmentation_autogen/mocs_compilation.cpp.i
+.PHONY : medicalSegmentation_autogen/mocs_compilation.cpp.i
 
-visor_medico_autogen/mocs_compilation.s: visor_medico_autogen/mocs_compilation.cpp.s
-.PHONY : visor_medico_autogen/mocs_compilation.s
+medicalSegmentation_autogen/mocs_compilation.s: medicalSegmentation_autogen/mocs_compilation.cpp.s
+.PHONY : medicalSegmentation_autogen/mocs_compilation.s
 
 # target to generate assembly for a file
-visor_medico_autogen/mocs_compilation.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/visor_medico.dir/build.make CMakeFiles/visor_medico.dir/visor_medico_autogen/mocs_compilation.cpp.s
-.PHONY : visor_medico_autogen/mocs_compilation.cpp.s
+medicalSegmentation_autogen/mocs_compilation.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/medicalSegmentation.dir/build.make CMakeFiles/medicalSegmentation.dir/medicalSegmentation_autogen/mocs_compilation.cpp.s
+.PHONY : medicalSegmentation_autogen/mocs_compilation.cpp.s
 
 # Help Target
 help:
@@ -246,8 +246,8 @@ help:
 	@echo "... depend"
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
-	@echo "... visor_medico_autogen"
-	@echo "... visor_medico"
+	@echo "... medicalSegmentation_autogen"
+	@echo "... medicalSegmentation"
 	@echo "... MedicalImageApp.o"
 	@echo "... MedicalImageApp.i"
 	@echo "... MedicalImageApp.s"
@@ -257,9 +257,9 @@ help:
 	@echo "... main.o"
 	@echo "... main.i"
 	@echo "... main.s"
-	@echo "... visor_medico_autogen/mocs_compilation.o"
-	@echo "... visor_medico_autogen/mocs_compilation.i"
-	@echo "... visor_medico_autogen/mocs_compilation.s"
+	@echo "... medicalSegmentation_autogen/mocs_compilation.o"
+	@echo "... medicalSegmentation_autogen/mocs_compilation.i"
+	@echo "... medicalSegmentation_autogen/mocs_compilation.s"
 .PHONY : help
 
 
