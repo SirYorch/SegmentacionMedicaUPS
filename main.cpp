@@ -219,6 +219,9 @@ Mat close(Mat imagen, int kernelSize){
     return salida;
 }
 
+
+
+
 int main() {
     string folder = "L333";
     auto files = getIMA(folder);
@@ -283,6 +286,7 @@ int main() {
 
     imshow("Controles", panel);
     
+    
 
 
    while (true) {
@@ -292,21 +296,17 @@ int main() {
         int kernel = 2 * ksizeTrack + 1;
         double sigma = sigmaTrack / 10.0;
         
-        
-        GaussianBlur(imagen, imagen, cv::Size(kernel, kernel), sigma);
-        
-        Mat imagenBlur = imagen.clone();
-
-    
-
-        if(clahe){
-            imagen = toClahe(imagen);
-        }
         if(eq){
             imagen = toEq(imagen);
         }
 
+        if(clahe){
+            imagen = toClahe(imagen);
+        }
         
+        GaussianBlur(imagen, imagen, cv::Size(kernel, kernel), sigma);
+        
+        Mat imagenBlur = imagen.clone();        
 
         // Umbralice
         // cout << umbralMin << " " << umbralMax;
