@@ -10,13 +10,12 @@ https://github.com/cszn/DnCNN
 
 debemos:
 
-- extraer slices de imágenes volumétricas
-- Traducir a imagenes manipulables
+
 
 Aplicar:
-- Preprocesamiento
-    - Ecualizacion
-    - clahe
+- Preprocesamiento (blur)
+    - gaussiano, para usarlo con blur gaussiano
+    
 - Binarización
     - umbral
 - Detección de bordes
@@ -32,6 +31,9 @@ Aplicar:
     - erosión
     - dilatación
 
+- Ecualización de color
+    - Ecualizacion de histograma
+    - clahe
 
 
 ### final
@@ -42,21 +44,18 @@ comparación cuantitativa de métodos clásicos de denoising, con métodos de y 
 
 
 
+# FUNCIONAMIENTO:
+
+- extraer slices de imágenes volumétricas
+- Traducir a imagenes manipulables
+
+Toda esta sección se hace al inicio y se guarda en un vector de objetos Mat, con las imagenes. 
+tambien podríamos hacerlo directo.
+
+Permitimos un slider para mostrar toda slas imagenes, dando una idea de imagen volumétrica que podemos recorrer hacia atras o adelante 
+
+Una vez con las imagenes, las podemos mostrar con imshow, 
 
 
+Permitimos un slider para mostrar el tamaño del kernel del blur gaussiano, 
 
-
-# Verificar que todo esté instalado
-make check
-
-# Ver información de compilación
-make info
-
-# Compilar el proyecto
-make
-
-# Ejecutar
-make run
-
-# O ejecutar directamente
-./mi_app

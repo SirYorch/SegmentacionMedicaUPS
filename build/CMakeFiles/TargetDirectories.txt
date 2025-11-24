@@ -1,4 +1,0 @@
-/home/siryorch/Documents/SegmentacionMedicaUPS/build/CMakeFiles/medicalSegmentation.dir
-/home/siryorch/Documents/SegmentacionMedicaUPS/build/CMakeFiles/edit_cache.dir
-/home/siryorch/Documents/SegmentacionMedicaUPS/build/CMakeFiles/rebuild_cache.dir
-/home/siryorch/Documents/SegmentacionMedicaUPS/build/CMakeFiles/medicalSegmentation_autogen.dir

@@ -330,7 +330,7 @@ int main() {
         imshow("Close", Close);
 
         int k = waitKey(30);
-        if (k == 27) break;
+        if (k == 27) break; 
     }
 
 
