@@ -5,6 +5,9 @@ Makefile
 # L333/  bien no queremos que se actualice, pero que se queden las versiones anteriores porque son el dataset como tal
 main.o
 # *.png
-DnCNN/
+__pycache__/
+.vscode/
+
 SegmentacionMedica*
 mi_app
+vision/

@@ -8,6 +8,7 @@
 #include <itkImageFileReader.h>
 #include <itkRescaleIntensityImageFilter.h>
 #include <itkGDCMImageIO.h>
+#include <curl/curl.h>
 
 using namespace std;
 using namespace cv;
@@ -726,6 +727,40 @@ Mat defineOrgan(Mat imagen, bool isLung) {
     return imagen;
 }
 
+void visualizeStats(Mat& imgDisplay, const Mat& mask, const Mat& imgOriginal) {
+    Mat labels, stats, centroids;
+    int nLabels = connectedComponentsWithStats(mask, labels, stats, centroids, 8, CV_32S);
+
+    for(int i = 1; i < nLabels; i++) {
+        // Area (Morfología)
+        int area = stats.at<int>(i, CC_STAT_AREA);
+        if(area < 50) continue; // Ignorar ruido muy pequeño para no saturar texto
+
+        // Mascara individual para calcular intensidad
+        Mat objMask = (labels == i);
+        Mat objMask8u;
+        objMask.convertTo(objMask8u, CV_8UC1);
+        
+        // Estadisticas de Intensidad (Densidad)
+        Scalar meanVal, stdDevVal;
+        meanStdDev(imgOriginal, meanVal, stdDevVal, objMask8u);
+
+        // Centroide para poner el texto
+        double cX = centroids.at<double>(i, 0);
+        double cY = centroids.at<double>(i, 1);
+
+        // Formato del texto: "A:Area M:MediaIntensidad"
+        // A = Tamaño hueso, M = Densidad aproximada
+        string info = "A:" + to_string(area) + " M:" + to_string((int)meanVal[0]);
+        
+        // Dibujar texto rojo pequeño. CORREGIDO: cv::Point
+        putText(imgDisplay, info, cv::Point(cX - 20, cY), FONT_HERSHEY_SIMPLEX, 0.35, Scalar(0, 0, 255), 1);
+    }
+}
+
+
+
+
 Mat sumarMascaras(Mat *maskLung, Mat *maskHeart, Mat *maskBone)
 {
     // Crear máscara final vacía
@@ -747,7 +782,7 @@ void encenderPulmones(Mat original);
 void encenderResults(Mat original);
 void encenderComparativa(Mat original);
 void encenderExtra(Mat original);
-void encenderPruebas(Mat original);
+void encenderPruebas(Mat &imagenBase);
 
 // MAIN
 
@@ -800,10 +835,11 @@ int main() {
             encenderComparativa(original);
             
         } else if (extra){ // VALORES DE LAS IMAGENES AISLADAS Y RESALTADAS EN LAS ZONAS QUE NOS INTERESAN
-            encenderExtra(original);
+            // encenderExtra(original);
             
         } else if (pruebas){ // SLIDERS Y BOTONES PARA HACER PRUEBAS CON LAS IMAGENES
-            encenderPruebas(original);
+            encenderPruebas(imgs[currentSlice]);
+            pruebas = false;   // Cerrar y volver al menú
             
         }
         
@@ -813,6 +849,71 @@ int main() {
     destroyAllWindows();
     return 0;
 }
+
+
+
+
+
+// para almacenar respuesta de cURL
+size_t WriteCallback(void* contents, size_t size, size_t nmemb, std::vector<uchar>* userp)
+{
+    size_t total = size * nmemb;
+    uchar* data = (uchar*)contents;
+    userp->insert(userp->end(), data, data + total);
+    return total;
+}
+
+
+Mat sendForDenoise(Mat img)
+{
+    // --- codificar la imagen como PNG ---
+    std::vector<uchar> buf;
+    imencode(".png", img, buf);
+
+    // --- Inicializar CURL ---
+    CURL* curl = curl_easy_init();
+    if (!curl) return img.clone();
+
+    std::vector<uchar> response;
+
+    curl_mime* mime;
+    curl_mimepart* part;
+
+    mime = curl_mime_init(curl);
+
+    // archivo enviado
+    part = curl_mime_addpart(mime);
+    curl_mime_name(part, "file");
+    curl_mime_filename(part, "input.png");
+    curl_mime_data(part, (const char*)buf.data(), buf.size());
+
+    // configurar CURL
+    curl_easy_setopt(curl, CURLOPT_URL, "http://0.0.0.0:8000/denoise");
+    curl_easy_setopt(curl, CURLOPT_MIMEPOST, mime);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
+
+    // ejecutar
+    CURLcode res = curl_easy_perform(curl);
+
+    Mat out;
+
+    if (res == CURLE_OK) {
+        out = imdecode(response, IMREAD_GRAYSCALE);
+    } else {
+        std::cerr << "ERROR denoise: " << curl_easy_strerror(res) << std::endl;
+        out = img.clone();
+    }
+
+    curl_mime_free(mime);
+    curl_easy_cleanup(curl);
+
+    return out;
+}
+
+
+
+
 
 // INTERFACES
 
@@ -835,9 +936,14 @@ void createSliceTrackbar() {
 void cerrarVentanas() {
     static vector<string> windows = {
         "Original", "Region de interés", "Umbralización", "Apertura",
-        "Sharpening", "Cierre", "CLAHE", "EQ", "Gauss", "Resultado", "Cierre2"
+        "Sharpening", "Cierre", "CLAHE", "EQ", "Gauss", "Resultado",
+        "Cierre2", "Mascara Filtrada", "Aislada", "PRUEBAS", "ORIGINAL",
+        "BLUR", "UMBRAL", "CLAHE", "EQUALIZE", "CIRCULAR MASK","FINAL","Denoised (Python)"
     };
+    // destroyWindow("Aislada");
+    
     for (auto &w : windows) destroyWindow(w);
+    
 }
 
 
@@ -938,30 +1044,24 @@ void encenderCorazon(Mat original){
 void encenderHueso(Mat original){
     prepareStandardView();
 
+    Mat work = original.clone();
 
-
-    imshow("Original", original);
-    moveWindow("Original", 500,0);
-
-
-    Mat roi = maskCircle2(original, 253, 264, 210, 147);
+    Mat roi = maskCircle2(work, 253, 264, 210, 147);
 
     Mat sharp = applySharpening(roi);
+    Mat blurred;
+    GaussianBlur(sharp, blurred, cv::Size(3,3), 0);
+    Mat umbral = Umbrilize(blurred, 117, 255);
+    Mat cierre = close(umbral, 3);
 
-    Mat Blur = toGaussianBlur(sharp, 3);
-    
-    Mat umbral = Umbrilize(original,117,255);
-
-    Mat cierre = close(original,3);
-
-    int kGap = 21; 
+    int kGap = 21;
     Mat k = getStructuringElement(MORPH_ELLIPSE, cv::Size(kGap, kGap));
-    Mat  flood;
+    Mat flood;
     dilate(cierre, flood, k);
     flood = fillHoles(flood);
     erode(flood, flood, k);
 
-    Mat maskFiltrada = filterByAreaAndIntensity(flood, original);
+    Mat maskFiltrada = filterByAreaAndIntensity(flood, roi);
 
     Mat Cierre2 = fillHoles(maskFiltrada);
 
@@ -981,6 +1081,8 @@ void encenderHueso(Mat original){
     moveWindow("Mascara Filtrada", 500+(original.cols)*2,original.rows);
     imshow("Cierre2", Cierre2);
     moveWindow("Cierre2", 0,original.rows);
+
+    
     
 
 }
@@ -1031,6 +1133,8 @@ void encenderPulmones( Mat original){
     imshow("Apertura", apertura);
     moveWindow("Apertura", 500+(original.cols)*1,original.rows);
 
+    
+
 }
 void encenderResults(Mat original){
     prepareStandardView();
@@ -1059,7 +1163,7 @@ void encenderResults(Mat original){
     imshow("Huesos", huesos);
     moveWindow("Huesos", 500+(original.cols)*0,original.rows);
     imshow("Mezcla", merged);
-    moveWindow("Merged", 500+(original.cols)*1,original.rows);
+    moveWindow("Mezcla", 500+(original.cols)*1,original.rows);
     imshow("Aislada", isolated);
     moveWindow("Aislada", 500+(original.cols)*2,original.rows);
     
@@ -1067,34 +1171,141 @@ void encenderResults(Mat original){
     
 }
 void encenderComparativa(Mat original){
+
     prepareStandardView();
 
-    ///  TODO: Quitar controles
-    ///  TODO: resultado aislado
-    ///  TODO: resultado obtenido con DnCNN // esto debe tardar un poco, agregamos un wait
-    
+    Mat original1 = original.clone();
+
+    Mat gauss = toGaussianBlur(original1, 3);
+
+    Mat denoised = sendForDenoise(original);
+
+    imshow("Original", original);
+    moveWindow("Original", 500,0);
+
+    imshow("Denoise Gauss", gauss);
+    moveWindow("Denoise Gauss", 0,500);
+
+    imshow("Denoised (Python)", denoised);
+    moveWindow("Denoised (Python)", original.cols*2 + 40, 0);
+
+    waitKey(10); // muestra ventana temporal
 }
-void encenderExtra(Mat original){
-    prepareStandardView();
 
-    ///  TODO: Quitar controles
-    ///  TODO: imagen con los organos aislados
-    ///  TODO: imagenes con los pulmones resaltados, dado la opinion del radiologo
-    ///  TODO: imagen merge, de los organos realzados
+
+
+// void encenderExtra(Mat original){
+//     prepareStandardView();
+
+//     ///  TODO: Quitar controles
+//     ///  TODO: imagen con los organos aislados
+//     ///  TODO: imagenes con los pulmones resaltados, dado la opinion del radiologo
+//     ///  TODO: imagen merge, de los organos realzados
     
-}
+// }
 
-
-void encenderPruebas(Mat original){
+void encenderPruebas(Mat &imagenBase){
     controles = true;
-    ///  TODO: Colocar controles
-    ///  TODO: imagen original
-    ///  TODO: imagen filtro CLAHE
-    ///  TODO: imagen filtro EQ
-    ///  TODO: imagen filtro Sharpening
-    ///  TODO: imagen filtro Gaussiano
-    ///  TODO: imagen filtro Umbralizacion
-    ///  TODO: imagen filtro close
-    ///  TODO: imagen filtro open
-    
+
+    namedWindow("PRUEBAS", WINDOW_NORMAL);
+    resizeWindow("PRUEBAS", 600, 400);
+
+    // --- TRACKBARS ---
+    createTrackbar("Kernel Blur",      "PRUEBAS", &ksizeTrack, 20);
+    createTrackbar("Sigma Blur x10",   "PRUEBAS", &sigmaTrack, 100);
+    createTrackbar("Umbral Min",       "PRUEBAS", &umbralMin, 255);
+    createTrackbar("Umbral Max",       "PRUEBAS", &umbralMax, 255);
+    createTrackbar("CLAHE (0/1)",      "PRUEBAS", (int*)&clahe, 1);
+    createTrackbar("Equalize (0/1)",   "PRUEBAS", (int*)&eq, 1);
+    createTrackbar("cx", "PRUEBAS", &cx, imagenBase.cols);
+    createTrackbar("cy", "PRUEBAS", &cy, imagenBase.rows);
+    createTrackbar("radioX", "PRUEBAS", &radioX, imagenBase.cols/2);
+    createTrackbar("radioY", "PRUEBAS", &radioY, imagenBase.rows/2);
+
+    // --- Ventanas de depuración ---
+    namedWindow("ORIGINAL", WINDOW_NORMAL);
+    namedWindow("BLUR", WINDOW_NORMAL);
+    namedWindow("UMBRAL", WINDOW_NORMAL);
+    namedWindow("CLAHE", WINDOW_NORMAL);
+    namedWindow("EQUALIZE", WINDOW_NORMAL);
+    namedWindow("CIRCULAR MASK", WINDOW_NORMAL);
+    namedWindow("FINAL", WINDOW_NORMAL);
+
+
+    Mat step_blur, step_umbral, step_clahe, step_eq, step_circular;
+
+    while (true) {
+
+        Mat preview = imagenBase.clone();
+
+        // -----------------------------------
+        // 1. BLUR
+        // -----------------------------------
+        int kB = (ksizeTrack % 2 == 0 ? ksizeTrack+1 : ksizeTrack);
+        double sigma = sigmaTrack / 10.0;
+
+        if (kB >= 1)
+            step_blur = toGaussianBlur(preview, kB, sigma);
+        else
+            step_blur = preview.clone();
+
+        // -----------------------------------
+        // 2. UMBRAL
+        // -----------------------------------
+        step_umbral = Umbrilize(step_blur, umbralMin, umbralMax);
+
+        // -----------------------------------
+        // 3. CLAHE
+        // -----------------------------------
+        step_clahe = clahe ? toClahe(step_blur) : step_blur.clone();
+
+        // -----------------------------------
+        // 4. EQUALIZE
+        // -----------------------------------
+        step_eq = eq ? toEq(step_clahe) : step_clahe.clone();
+
+        // -----------------------------------
+        // 5. Máscara circular
+        // -----------------------------------
+        step_circular = maskCircle2(step_eq, cx, cy, radioX, radioY);
+
+        // -----------------------------------
+        // MOSTRAR TODAS LAS VENTANAS
+        // -----------------------------------
+        imshow("ORIGINAL", imagenBase);
+        moveWindow("ORIGINAL", 0, 0);
+
+        imshow("BLUR", step_blur);
+        moveWindow("BLUR", imagenBase.cols + 10, 0);
+
+        imshow("UMBRAL", step_umbral);
+        moveWindow("UMBRAL", (imagenBase.cols * 2) + 20, 0);
+
+        imshow("CLAHE", step_clahe);
+        moveWindow("CLAHE", 0, imagenBase.rows + 40);
+
+        imshow("EQUALIZE", step_eq);
+        moveWindow("EQUALIZE", imagenBase.cols + 10, imagenBase.rows + 40);
+
+        imshow("CIRCULAR MASK", step_circular);
+        moveWindow("CIRCULAR MASK", (imagenBase.cols * 2) + 20, imagenBase.rows + 40);
+
+        imshow("FINAL", step_circular);
+        moveWindow("FINAL", imagenBase.cols, imagenBase.rows * 2 + 80);
+
+        // -----------------------------------
+        // Escape
+        int key = waitKey(30);
+        if (key == 27) break;
+    }
+
+    // Cerrar ventanas
+    destroyWindow("PRUEBAS");
+    destroyWindow("ORIGINAL");
+    destroyWindow("BLUR");
+    destroyWindow("UMBRAL");
+    destroyWindow("CLAHE");
+    destroyWindow("EQUALIZE");
+    destroyWindow("CIRCULAR MASK");
+    destroyWindow("FINAL");
 }
