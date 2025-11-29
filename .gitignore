@@ -2,6 +2,9 @@ CMakeLists.txt
 build/
 Makefile
 .vscode/
-L333/
+# L333/  bien no queremos que se actualice, pero que se queden las versiones anteriores porque son el dataset como tal
 main.o
-*.png
+# *.png
+DnCNN/
+SegmentacionMedica*
+mi_app

@@ -15,7 +15,7 @@ using namespace itk;
 
 // --- NUEVO: VARIABLES GLOBALES PARA EL MENÚ ---
 Mat img_menu_normal;
-Mat img_menu_click;
+// Mat img_menu_click;
 bool enMenu = true; // Indica si estamos en el menú o en la app
 
 // ¡¡¡¡ IMPORTANTE: CALIBRA ESTOS VALORES !!!!
@@ -165,52 +165,105 @@ Mat defineOrgan(Mat imagen, bool isLung);
 Mat mergeMasks(Mat &imgOriginal, Mat &maskLung, float alpha = 0.3);
 Mat mergeMasksHeart(Mat &imgOriginal, Mat &maskLung, float alpha = 0.3);
 Mat mergeMasksBones(Mat &imgOriginal, Mat &maskBone, float alpha = 0.3);
-Mat mejorarNitidez(Mat imagenEntrada);
+// Mat mejorarNitidez(Mat imagenEntrada);
+
+
+struct Button {
+    int x1, y1, x2, y2;
+};
+ 
+Button btn_corazon  = {50, 225, 147, 252};
+Button btn_huesos   = {200, 225, 300, 252};
+Button btn_pulmones = {359, 225, 460, 252};
+
+Button btn_result   = {50, 297, 147, 330};
+Button btn_comp     = {200, 297, 300, 330};
+Button btn_extra    = {359, 297, 460, 330};
+
+bool inside(Button b, int x, int y) {
+    return (x > b.x1 && x < b.x2 && y > b.y1 && y < b.y2);
+}
+
+void drawMask(Mat &img, Button b) {
+    Rect rect(b.x1, b.y1, b.x2 - b.x1, b.y2 - b.y1);
+
+    // Crear una copia de la imagen original para el overlay
+    Mat overlay;
+    img.copyTo(overlay);
+
+    // Color del rectángulo (BGR)
+    Scalar color(255, 100, 100); // Azul suave
+    double alpha = 0.2; // 20% de opacidad
+
+    // Dibujar el rectángulo lleno en el overlay
+    rectangle(overlay, rect, color, FILLED);
+
+    // Mezclar overlay + original según la máscara del rectángulo
+    addWeighted(overlay, alpha, img, 1 - alpha, 0, img);
+}
+
+Mat img_normal;
+Mat img_click; 
 
 // --- MODIFICACIÓN CLAVE: MOUSE CALLBACK UNIFICADO ---
 void onMouse(int event, int x, int y, int flags, void* userdata) {
     if (event == EVENT_LBUTTONDOWN) {
-        
-        // 1. LÓGICA SI ESTAMOS EN EL MENÚ
-        if (enMenu) {
-            cout << "Menu Click: " << x << ", " << y << endl; // Para calibrar
 
-            // Verificar si clic en BOTÓN INICIAR
-            if (x >= BTN_INICIAR_X1 && x <= BTN_INICIAR_X2 && 
-                y >= BTN_INICIAR_Y1 && y <= BTN_INICIAR_Y2) {
-                
-                // Efecto visual
-                imshow("Aplicacion Principal", img_menu_click);
-                waitKey(150);
+        cout << "Click: " << x << " " << y << endl;
 
-                // CAMBIO DE ESTADO: Salir del menú, entrar a la app
-                enMenu = false;
-                cout << ">>> INICIANDO APLICACIÓN..." << endl;
-            }
+        // Copiamos la imagen normal
+        img_click = img_normal.clone();
+
+        // ---- BOTON CORAZÓN ----
+        if (inside(btn_corazon, x, y)) {
+            drawMask(img_click, btn_corazon);
+            imshow("Aplicacion Principal", img_click);
+            waitKey(120);   // pequeña pausa visual
+            cout << "Botón: CORAZÓN\n";
         }
-        // 2. LÓGICA SI ESTAMOS EN LA APP (Tus botones CLAHE/Eq)
-        else {
-            if (btnCLAHE.contains(cv::Point(x, y))) {
-                clahe = !clahe;
-                cout << "CLAHE: " << (clahe ? "ON\n" : "OFF\n");
-            }
-            if (btnEq.contains(cv::Point(x, y))) {
-                eq = !eq;
-                cout << "Eq: " << (eq ? "ON\n" : "OFF\n");
-            }
-            
-            // Redibujado del panel de controles
-            Mat panel(60, 300, CV_8UC3, Scalar(50, 50, 50));
-            Scalar colorClahe = clahe ? Scalar(100, 255, 100) : Scalar(200, 200, 200);
-            Scalar colorEq = eq ? Scalar(100, 255, 100) : Scalar(200, 200, 200);
-            
-            rectangle(panel, btnCLAHE, colorClahe, FILLED);
-            putText(panel, "CLAHE", cv::Point(25, 35), FONT_HERSHEY_SIMPLEX, 0.7, Scalar(0,0,0));
-            rectangle(panel, btnEq, colorEq, FILLED);
-            putText(panel, "EQ HIST", cv::Point(35, 85), FONT_HERSHEY_SIMPLEX, 0.7, Scalar(0,0,0));
-            
-            imshow("Aplicacion Principal", panel); // Ojo: Ahora usamos una ventana principal compartida o la de controles
+
+        // ---- BOTON HUESOS ----
+        else if (inside(btn_huesos, x, y)) {
+            drawMask(img_click, btn_huesos);
+            imshow("Aplicacion Principal", img_click);
+            waitKey(120);
+            cout << "Botón: HUESOS\n";
         }
+
+        // ---- BOTON PULMONES ----
+        else if (inside(btn_pulmones, x, y)) {
+            drawMask(img_click, btn_pulmones);
+            imshow("Aplicacion Principal", img_click);
+            waitKey(120);
+            cout << "Botón: PULMONES\n";
+        }
+
+        // ---- RESULTADOS ----
+        else if (inside(btn_result, x, y)) {
+            drawMask(img_click, btn_result);
+            imshow("Aplicacion Principal", img_click);
+            waitKey(120);
+            cout << "Botón: RESULTADOS\n";
+        }
+
+        // ---- COMPARACION DnCNN ----
+        else if (inside(btn_comp, x, y)) {
+            drawMask(img_click, btn_comp);
+            imshow("Aplicacion Principal", img_click);
+            waitKey(120);
+            cout << "Botón: COMPARACION DnCNN\n";
+        }
+
+        // ---- EXTRA ----
+        else if (inside(btn_extra, x, y)) {
+            drawMask(img_click, btn_extra);
+            imshow("Aplicacion Principal", img_click);
+            waitKey(120);
+            cout << "Botón: EXTRA\n";
+        }
+
+        // Restauramos la imagen normal después de la animación
+        imshow("Aplicacion Principal", img_normal);
     }
 }
 
@@ -219,16 +272,18 @@ int main() {
     // 1. CARGA DE RECURSOS (Imágenes DICOM y Menú)
     
     // Cargar Menu
-    img_menu_normal = imread("img_normal.png");
-    img_menu_click = imread("img_click.png");
+    img_normal = imread("img_normal.png");
+    // img_menu_click = imread("img_click.png");
 
-    if (img_menu_normal.empty() || img_menu_click.empty()) {
-        cout << "ADVERTENCIA: No se encontraron menu_normal.png o menu_click.png. Creando fondo negro." << endl;
-        img_menu_normal = Mat::zeros(600, 800, CV_8UC3);
-        img_menu_click = Mat::zeros(600, 800, CV_8UC3);
+    resize(img_normal,img_normal,cv::Size(500, 350));
+
+    // if (img_menu_normal.empty() || img_menu_click.empty()) {
+    //     cout << "ADVERTENCIA: No se encontraron menu_normal.png o menu_click.png. Creando fondo negro." << endl;
+    //     img_menu_normal = Mat::zeros(600, 800, CV_8UC3);
+    //     img_menu_click = Mat::zeros(600, 800, CV_8UC3);
      
-        putText(img_menu_normal, "MENU (Faltan imagenes)", cv::Point(50,300), FONT_HERSHEY_SIMPLEX, 1, Scalar(255,255,255));
-    }
+    //     putText(img_menu_normal, "MENU (Faltan imagenes)", cv::Point(50,300), FONT_HERSHEY_SIMPLEX, 1, Scalar(255,255,255));
+    // }
 
     // Cargar DICOMS (ITK)
     string folder = "L333";
@@ -261,7 +316,7 @@ int main() {
         
         // --- CASO A: ESTAMOS EN EL MENÚ ---
         if (enMenu) {
-            imshow("Aplicacion Principal", img_menu_normal);
+            imshow("Aplicacion Principal", img_normal);
             // Esperamos clic
             if (waitKey(30) == 27) break; // ESC para salir
         }
@@ -272,7 +327,7 @@ int main() {
             // Inicialización única al entrar a la app (Crear ventanas)
             if (!ventanasCreadas) {
                 // Reconfigurar la ventana "Aplicacion Principal" para que sea "Controles"
-                resizeWindow("Aplicacion Principal", 300, 100); 
+                // resizeWindow("Aplicacion Principal", 300, 100); 
                 createTrackbar("Slice", "Aplicacion Principal", &currentSlice, imgs.size() - 1);
                 
                 // Crear el resto de ventanas
@@ -310,7 +365,7 @@ int main() {
             Mat pulmonesMascara = imgs[currentSlice].clone();
             pulmonesMascara = defineOrgan(pulmonesMascara, true); 
             Mat completaPulmones = mergeMasks(Original, pulmonesMascara, 0.3);
-            Mat imagenFinal = mejorarNitidez(completaPulmones);
+            // Mat imagenFinal = mejorarNitidez(completaPulmones);
 
             imshow("Pulmones", pulmonesMascara);
             imshow("CompletaPulmones", completaPulmones);
