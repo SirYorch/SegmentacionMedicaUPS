@@ -13,6 +13,16 @@ using namespace std;
 using namespace cv;
 using namespace itk;
 
+// --- NUEVO: VARIABLES GLOBALES PARA EL MENÚ ---
+Mat img_menu_normal;
+Mat img_menu_click;
+bool enMenu = true; // Indica si estamos en el menú o en la app
+
+// ¡¡¡¡ IMPORTANTE: CALIBRA ESTOS VALORES !!!!
+// Usa los couts de la consola para ver donde haces clic y ajustar esto
+const int BTN_INICIAR_X1 = 100, BTN_INICIAR_X2 = 300;
+const int BTN_INICIAR_Y1 = 200, BTN_INICIAR_Y2 = 250;
+// ----------------------------------------------
 
 using InputPixelType  = short;
 using OutputPixelType = unsigned char;
@@ -20,8 +30,8 @@ using InputImageType  = Image<InputPixelType, 2>;
 using OutputImageType = Image<OutputPixelType, 2>;
 
 int currentSlice = 0;
-int ksizeTrack = 3;       // representará kernel = 2*ksizeTrack + 1
-int sigmaTrack = 10;      // representará sigma = sigmaTrack / 10.0
+int ksizeTrack = 3;       
+int sigmaTrack = 10;      
 int umbralMin = 0;
 int umbralMax = 255;
 int cx = 100;
@@ -34,30 +44,27 @@ int kernelSize = 3;
 bool clahe = false;
 bool eq = false;
 
+// Declaración global de botones de la APP (no del menú)
+Rect btnCLAHE(10, 10, 120, 40);
+Rect btnEq(10, 60, 120, 40);
 
-void updateKSize(int KSize){
-    KSize = KSize*2+1;
-    
-}
+// ... [TUS FUNCIONES AUXILIARES: ITKToMat, readRaw, readIMA, etc. SE MANTIENEN IGUAL] ...
+// (Las pego colapsadas para ahorrar espacio, el código lógico no cambia)
 
-//en este método se aplican los umbrales de mayor y menor para poder definir los mejores valores
+void updateKSize(int KSize){ KSize = KSize*2+1; }
+
 Mat Umbrilize(Mat imagen, int umbralMin, int umbralMax){
     Mat img = Mat::zeros(imagen.rows, imagen.cols, CV_8UC1);
-    
     for(int i =0 ; i < imagen.rows ; i ++){
         for(int j =0 ; j < imagen.cols ; j ++){
             uchar pixel = imagen.at<uchar>(i, j);
-
-            if (pixel >= umbralMin && pixel <= umbralMax)
-                img.at<uchar>(i, j) = 255;     // Blanco (dentro del rango)
-            else
-                img.at<uchar>(i, j) = 0;       // Negro (fuera del rango)      
+            if (pixel >= umbralMin && pixel <= umbralMax) img.at<uchar>(i, j) = 255;     
+            else img.at<uchar>(i, j) = 0;       
         }   
     }
     return img;
 }
 
-// Convertir ITK → OpenCV
 Mat ITKToMat(OutputImageType::Pointer img) {
     auto size = img->GetLargestPossibleRegion().GetSize();
     Mat out(size[1], size[0], CV_8UC1);
@@ -65,48 +72,21 @@ Mat ITKToMat(OutputImageType::Pointer img) {
     return out;
 }
 
-// Leer como RAW (fallback)
-Mat readRaw(const string& filename) {
-    ifstream f(filename, ios::binary);
-    if (!f.is_open()) return Mat();
-
-    f.seekg(0, ios::end);
-    size_t total = f.tellg();
-    f.seekg(0, ios::beg);
-
-    size_t pixels = total / 2;
-    int side = sqrt(pixels);
-
-    vector<short> buffer(side * side);
-    f.read((char*)buffer.data(), total);
-
-    Mat img16(side, side, CV_16SC1, buffer.data());
-    Mat img8;
-    normalize(img16, img8, 0, 255, NORM_MINMAX);
-    img8.convertTo(img8, CV_8UC1);
-
-    return img8.clone();
-}
-
-// Leer IMA con ITK o RAW
 Mat readIMA(const string& filename) {
     try {
         using ImageIOType = GDCMImageIO;
         ImageIOType::Pointer dicomIO = ImageIOType::New();
-
         using ReaderType = ImageFileReader<InputImageType>;
         ReaderType::Pointer reader = ReaderType::New();
         reader->SetImageIO(dicomIO);
         reader->SetFileName(filename);
         reader->Update();
-
         using RescaleType = RescaleIntensityImageFilter<InputImageType, OutputImageType>;
         RescaleType::Pointer scale = RescaleType::New();
         scale->SetInput(reader->GetOutput());
         scale->SetOutputMinimum(0);
         scale->SetOutputMaximum(255);
         scale->Update();
-
         return ITKToMat(scale->GetOutput());
     }
     catch (...) {
@@ -117,157 +97,350 @@ Mat readIMA(const string& filename) {
 
 Mat toClahe(Mat imagen){
     Mat salida;
-
     Ptr<CLAHE> clahe = createCLAHE(2.0, cv::Size(8, 8));
     clahe->apply(imagen, salida);
-
     return salida;
 }
 
-
 Mat toEq(Mat imagen){
-    
     equalizeHist(imagen, imagen);
-    
     return imagen;
 }
 
 Mat toGaussianBlur(Mat imagen, int kernelSize = 5, double sigma = 0) {
     Mat salida;
-
-    // El kernel debe ser impar
     if (kernelSize % 2 == 0) kernelSize++;
-
     GaussianBlur(imagen, salida, cv::Size(kernelSize, kernelSize), sigma);
-
     return salida;
 }
 
-
-// Obtener lista de .ima
 vector<string> getIMA(const string& dir) {
     vector<string> files;
-
     for (auto& e : filesystem::directory_iterator(dir)) {
         if (!e.is_regular_file()) continue;
-
         string ext = e.path().extension().string();
         transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-
-        if (ext == ".ima")   // ahora acepta .IMA y .ima
-            // cout << e << endl;  
-            files.push_back(e.path().string());
+        if (ext == ".ima") files.push_back(e.path().string());
     }
-
     sort(files.begin(), files.end());
     return files;
 }
 
-void activateClahe(int estado, void*) {
-    if (estado)
-        clahe << true;
-    else
-        clahe << false;
-}
-
-
-void activateEq(int estado, void*) {
-    if (estado)
-        eq << true;
-    else
-        eq << false;
-}
-
-
-
-
-// Declaración global de botones
-Rect btnCLAHE(10, 10, 120, 40);
-Rect btnEq(10, 60, 120, 40);
-
-// Estado de botones (si quieres alternar)
-
-
 Mat maskCircle(Mat &img, int cx, int cy, int rx, int ry) {
     Mat mask = Mat::zeros(img.rows, img.cols, CV_8UC1);
-
-    // 1. Dibujar círculo blanco = zona visible
     ellipse(mask, cv::Point(cx, cy), cv::Size(rx, ry), 0, 0, 360, Scalar(255), FILLED);
-
-    // 2. Crear salida blanca (color blanco completo)
     Mat salida(img.rows, img.cols, img.type(), Scalar(255));
-
-    // 3. Copiar dentro del círculo la imagen original
     img.copyTo(salida, mask);
-
     return salida;
 }
 
-
-void onMouse(int event, int x, int y, int flags, void*) {
-    if (event == EVENT_LBUTTONDOWN) {
-        if (btnCLAHE.contains(cv::Point(x, y))) {
-            clahe = !clahe;
-            cout << "CLAHE: " << (clahe ? "ON\n" : "OFF\n");
-        }
-        if (btnEq.contains(cv::Point(x, y))) {
-            eq = !eq;
-            cout << "Eq: " << (eq ? "ON\n" : "OFF\n");
-        }
-        
-    }
-
-    // Redibujar controles para feedback visual (opcional pero recomendado)
-        Mat panel(60, 300, CV_8UC3, Scalar(50, 50, 50));
-        
-        // // Color del botón según estado
-        // Scalar colorClahe = clahe ? Scalar(100, 255, 100) : Scalar(200, 200, 200);
-        // Scalar colorEq = eq ? Scalar(100, 255, 100) : Scalar(200, 200, 200);
-
-        // rectangle(panel, btnCLAHE, colorClahe, FILLED);
-        // putText(panel, "CLAHE", cv::Point(25, 35), FONT_HERSHEY_SIMPLEX, 0.7, Scalar(0,0,0));
-
-        // rectangle(panel, btnEq, colorEq, FILLED);
-        // putText(panel, "EQ HIST", cv::Point(35, 85), FONT_HERSHEY_SIMPLEX, 0.7, Scalar(0,0,0));
-
-        imshow("Controles", panel);
-
-}
 Mat open(Mat imagen, int kernelSize){
-    // Retorna proceso de apertura, erosion y dilatacion
     Mat erodida, salida;
-
     Mat kernel = getStructuringElement(MORPH_RECT, cv::Size(kernelSize, kernelSize));
-
     erode(imagen, erodida, kernel);
     dilate(erodida, salida, kernel);
     return salida;
 }
 
 Mat close(Mat imagen, int kernelSize){
-    // Retorna proceso de apertura, erosion y dilatacion
     Mat dilatada, salida;
-
     Mat kernel = getStructuringElement(MORPH_RECT, cv::Size(kernelSize, kernelSize));
-
     dilate(imagen, dilatada, kernel);
     erode(dilatada, salida, kernel);
-    
     return salida;
 }
 
+Mat boneWindowing(Mat imagen, int minVal, int maxVal) {
+    Mat salida = imagen.clone();
+    double escala = 255.0 / (double)(maxVal - minVal);
+    imagen.convertTo(salida, -1, escala, -minVal * escala);
+    return salida;
+}
+
+// ... [INCLUIR AQUÍ TUS FUNCIONES defineBones, defineOrgan, mergeMasks, etc. INTACTAS] ...
+// (Para que el código compile, asumo que están definidas tal cual me las pasaste arriba)
+// POR BREVEDAD, SOLO PONGO LOS PROTOTIPOS AQUÍ, PERO EN TU CÓDIGO DÉJALAS COMPLETAS:
+Mat defineBones(Mat imagen); 
+Mat defineOrgan(Mat imagen, bool isLung);
+Mat mergeMasks(Mat &imgOriginal, Mat &maskLung, float alpha = 0.3);
+Mat mergeMasksHeart(Mat &imgOriginal, Mat &maskLung, float alpha = 0.3);
+Mat mergeMasksBones(Mat &imgOriginal, Mat &maskBone, float alpha = 0.3);
+Mat mejorarNitidez(Mat imagenEntrada);
+
+// --- MODIFICACIÓN CLAVE: MOUSE CALLBACK UNIFICADO ---
+void onMouse(int event, int x, int y, int flags, void* userdata) {
+    if (event == EVENT_LBUTTONDOWN) {
+        
+        // 1. LÓGICA SI ESTAMOS EN EL MENÚ
+        if (enMenu) {
+            cout << "Menu Click: " << x << ", " << y << endl; // Para calibrar
+
+            // Verificar si clic en BOTÓN INICIAR
+            if (x >= BTN_INICIAR_X1 && x <= BTN_INICIAR_X2 && 
+                y >= BTN_INICIAR_Y1 && y <= BTN_INICIAR_Y2) {
+                
+                // Efecto visual
+                imshow("Aplicacion Principal", img_menu_click);
+                waitKey(150);
+
+                // CAMBIO DE ESTADO: Salir del menú, entrar a la app
+                enMenu = false;
+                cout << ">>> INICIANDO APLICACIÓN..." << endl;
+            }
+        }
+        // 2. LÓGICA SI ESTAMOS EN LA APP (Tus botones CLAHE/Eq)
+        else {
+            if (btnCLAHE.contains(cv::Point(x, y))) {
+                clahe = !clahe;
+                cout << "CLAHE: " << (clahe ? "ON\n" : "OFF\n");
+            }
+            if (btnEq.contains(cv::Point(x, y))) {
+                eq = !eq;
+                cout << "Eq: " << (eq ? "ON\n" : "OFF\n");
+            }
+            
+            // Redibujado del panel de controles
+            Mat panel(60, 300, CV_8UC3, Scalar(50, 50, 50));
+            Scalar colorClahe = clahe ? Scalar(100, 255, 100) : Scalar(200, 200, 200);
+            Scalar colorEq = eq ? Scalar(100, 255, 100) : Scalar(200, 200, 200);
+            
+            rectangle(panel, btnCLAHE, colorClahe, FILLED);
+            putText(panel, "CLAHE", cv::Point(25, 35), FONT_HERSHEY_SIMPLEX, 0.7, Scalar(0,0,0));
+            rectangle(panel, btnEq, colorEq, FILLED);
+            putText(panel, "EQ HIST", cv::Point(35, 85), FONT_HERSHEY_SIMPLEX, 0.7, Scalar(0,0,0));
+            
+            imshow("Aplicacion Principal", panel); // Ojo: Ahora usamos una ventana principal compartida o la de controles
+        }
+    }
+}
+
+// ---------------- MAIN ----------------
+int main() {
+    // 1. CARGA DE RECURSOS (Imágenes DICOM y Menú)
+    
+    // Cargar Menu
+    img_menu_normal = imread("img_normal.png");
+    img_menu_click = imread("img_click.png");
+
+    if (img_menu_normal.empty() || img_menu_click.empty()) {
+        cout << "ADVERTENCIA: No se encontraron menu_normal.png o menu_click.png. Creando fondo negro." << endl;
+        img_menu_normal = Mat::zeros(600, 800, CV_8UC3);
+        img_menu_click = Mat::zeros(600, 800, CV_8UC3);
+     
+        putText(img_menu_normal, "MENU (Faltan imagenes)", cv::Point(50,300), FONT_HERSHEY_SIMPLEX, 1, Scalar(255,255,255));
+    }
+
+    // Cargar DICOMS (ITK)
+    string folder = "L333";
+    auto files = getIMA(folder);
+    vector<Mat> imgs;
+    imgs.reserve(files.size());
+
+    cout << "Cargando imagenes DICOM/IMA..." << endl;
+    for (auto& f : files) {
+        Mat m = readIMA(f);
+        if (m.empty()) m = Mat::zeros(256, 256, CV_8UC1);
+        imgs.push_back(m);
+    }
+    if (imgs.empty()) {
+        cout << "No se pudo cargar ninguna imagen DICOM\n";
+        return 1;
+    }
+    cout << "Carga completa." << endl;
+
+    // 2. CONFIGURACIÓN DE VENTANA PRINCIPAL
+    // Usaremos "Aplicacion Principal" para el Menú y luego para los Controles
+    namedWindow("Aplicacion Principal", WINDOW_AUTOSIZE);
+    setMouseCallback("Aplicacion Principal", onMouse);
+    
+    // Variables de control de ventanas creadas
+    bool ventanasCreadas = false; 
+
+    // 3. BUCLE DE EJECUCIÓN
+    while (true) {
+        
+        // --- CASO A: ESTAMOS EN EL MENÚ ---
+        if (enMenu) {
+            imshow("Aplicacion Principal", img_menu_normal);
+            // Esperamos clic
+            if (waitKey(30) == 27) break; // ESC para salir
+        }
+        
+        // --- CASO B: ESTAMOS EN LA APP (VISUALIZACIÓN) ---
+        else {
+            
+            // Inicialización única al entrar a la app (Crear ventanas)
+            if (!ventanasCreadas) {
+                // Reconfigurar la ventana "Aplicacion Principal" para que sea "Controles"
+                resizeWindow("Aplicacion Principal", 300, 100); 
+                createTrackbar("Slice", "Aplicacion Principal", &currentSlice, imgs.size() - 1);
+                
+                // Crear el resto de ventanas
+                namedWindow("Pulmones", WINDOW_AUTOSIZE);
+                namedWindow("CompletaPulmones", WINDOW_AUTOSIZE);
+                namedWindow("CorazonMascara", WINDOW_AUTOSIZE);
+                namedWindow("CompletaCorazon", WINDOW_AUTOSIZE); 
+                namedWindow("HuesosMascara", WINDOW_AUTOSIZE);
+                namedWindow("CompletaHuesos", WINDOW_AUTOSIZE); 
+
+                moveWindow("Pulmones", 300, 500);
+                moveWindow("CompletaPulmones", 300, 0);
+                moveWindow("CorazonMascara", 810, 500); 
+                moveWindow("CompletaCorazon", 810, 0); 
+                moveWindow("HuesosMascara", 1320, 500); 
+                moveWindow("CompletaHuesos", 1320, 0); 
+
+                ventanasCreadas = true;
+                
+                // Dibujar panel inicial de controles
+                Mat panel(100, 300, CV_8UC3, Scalar(50, 50, 50));
+                rectangle(panel, btnCLAHE, Scalar(200,200,200), FILLED);
+                putText(panel, "CLAHE", cv::Point(25, 35), FONT_HERSHEY_SIMPLEX, 0.7, Scalar(0,0,0));
+                rectangle(panel, btnEq, Scalar(200,200,200), FILLED);
+                putText(panel, "EQ HIST", cv::Point(35, 85), FONT_HERSHEY_SIMPLEX, 0.7, Scalar(0,0,0));
+                imshow("Aplicacion Principal", panel);
+            }
+
+            // --- LÓGICA DE PROCESAMIENTO EXISTENTE ---
+            Mat Original = imgs[currentSlice].clone();
+            if (clahe) Original = toClahe(Original); // Aplicar filtros si están activos
+            if (eq) Original = toEq(Original);
+
+            // Pulmones
+            Mat pulmonesMascara = imgs[currentSlice].clone();
+            pulmonesMascara = defineOrgan(pulmonesMascara, true); 
+            Mat completaPulmones = mergeMasks(Original, pulmonesMascara, 0.3);
+            Mat imagenFinal = mejorarNitidez(completaPulmones);
+
+            imshow("Pulmones", pulmonesMascara);
+            imshow("CompletaPulmones", completaPulmones);
+            // imshow("NitidaPulmones", imagenFinal); // Opcional
+
+            // Corazon
+            Mat corazonMascara = imgs[currentSlice].clone();
+            corazonMascara = defineOrgan(corazonMascara, false);
+            Mat completaCorazon = mergeMasksHeart(Original, corazonMascara, 0.3);
+
+            imshow("CorazonMascara", corazonMascara);
+            imshow("CompletaCorazon", completaCorazon);
+
+            // Huesos
+            Mat huesosMascara = imgs[currentSlice].clone();
+            huesosMascara = defineBones(huesosMascara);
+            Mat completaHuesos = mergeMasksBones(Original, huesosMascara, 0.4);
+
+            imshow("HuesosMascara", huesosMascara);
+            imshow("CompletaHuesos", completaHuesos);
+
+            int k = waitKey(30);
+            if (k == 27) break; // ESC para salir
+        }
+    }
+
+    destroyAllWindows();
+    return 0;
+}
+
+// COPIA AQUÍ ABAJO EL RESTO DE TUS FUNCIONES (defineOrgan, defineBones, etc.)
+// ...
+
 Mat defineBones(Mat imagen) {
+    Mat procesada;
+    procesada = boneWindowing(imagen, 120, 255);
+    cv::GaussianBlur(imagen, procesada, cv::Size(3, 3), 0);
+    procesada = toClahe(procesada);
 
-    int minBone = 150; 
-    int maxBone = 255;
-    int kernelBone = 1; // Kernel pequeño para no fusionar costillas cercanas
+    // 1. UMBRALIZACIÓN 
+    int t_strong = 170; 
+    int t_weak = 158; 
 
-    // 2. Umbralización (Lo más importante)
-    imagen = Umbrilize(imagen, minBone, maxBone);
-    imagen = close(imagen, kernelBone);
-    imagen = open(imagen, kernelBone);
+    Mat fuerte, debil;
+    cv::threshold(procesada, fuerte, t_strong, 255, cv::THRESH_BINARY);
+    cv::threshold(procesada, debil, t_weak, 255, cv::THRESH_BINARY);
 
-    return imagen;
+    // -------------------------------------------------------------
+   //EROSIÓN 
+    // -------------------------------------------------------------
+    Mat kernelErosion = cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(3, 3));
+    cv::erode(debil, debil, kernelErosion);
+    // -------------------------------------------------------------
+
+    Mat labels, stats, centroids;
+    int nLabels = cv::connectedComponentsWithStats(debil, labels, stats, centroids);
+
+    Mat mascaraBase = Mat::zeros(imagen.size(), CV_8UC1);
+
+    // Filtro de área (INTACTO)
+    int minArea = 25; 
+
+    // --- PARÁMETROS DE LA ZONA DE MUERTE ---
+    int zmX = 263;      
+    int zmY = 210;      
+    int zmRadio = 94;   
+    int areaColumnaGigante = 10000; 
+
+    // --- CONFIGURACIÓN DEL INTERVALO DE SLICES ---
+    // La zona de muerte solo se activa en estos slices
+    int inicioZonaMuerte = 245; 
+    int finZonaMuerte = 438;
+    // ---------------------------------------------
+
+    for(int i = 1; i < nLabels; i++) {
+        // Filtro básico de ruido
+        if (stats.at<int>(i, cv::CC_STAT_AREA) < minArea) continue;
+
+        Mat maskIsla = (labels == i);
+
+        // Solo aplicamos esto si estamos en los slices del estómago
+        if (currentSlice >= inicioZonaMuerte && currentSlice <= finZonaMuerte) {
+            
+            double cX = centroids.at<double>(i, 0);
+            double cY = centroids.at<double>(i, 1);
+
+            // Distancia euclidiana al centro de la zona de muerte
+            double dist = std::sqrt(std::pow(cX - zmX, 2) + std::pow(cY - zmY, 2));
+
+            // Si el objeto está DENTRO del círculo de muerte
+            if (dist < zmRadio) {
+                // Si NO es la columna gigante, lo matamos.
+                if (stats.at<int>(i, cv::CC_STAT_AREA) < areaColumnaGigante) {
+                    continue; // Está en la zona prohibida y es pequeño -> BORRAR
+                }
+            }
+        }
+
+        double minVal, maxVal;
+        cv::minMaxLoc(imagen, &minVal, &maxVal, NULL, NULL, maskIsla);
+
+        double umbralDureza = 180.0;
+
+        if (maxVal < umbralDureza) {
+            continue; // No tiene "corazón duro" -> BORRAR
+        }
+        // -------------------------------------------------------------
+
+        cv::bitwise_or(mascaraBase, maskIsla, mascaraBase);
+    }
+
+
+    // --- RELLENO Y RESTAURACIÓN (INTACTO) ---
+    Mat resultadoFinal = mascaraBase.clone();
+
+    // Dilatación para recuperar lo erosionado
+    cv::dilate(resultadoFinal, resultadoFinal, kernelErosion);
+
+    // Cierre
+    Mat kernelCierre = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(7, 7));
+    cv::morphologyEx(resultadoFinal, resultadoFinal, cv::MORPH_CLOSE, kernelCierre);
+
+    // Relleno final
+    vector<vector<cv::Point>> contours;
+    cv::findContours(resultadoFinal, contours, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE);
+    for(size_t i = 0; i < contours.size(); i++) {
+        cv::drawContours(resultadoFinal, contours, (int)i, Scalar(255), cv::FILLED);
+    }
+    
+    return resultadoFinal;
 }
 
 Mat defineOrgan(Mat imagen, bool isLung) {
@@ -333,7 +506,6 @@ Mat defineOrgan(Mat imagen, bool isLung) {
                 }
             }
             
-            // Crear una máscara negra limpia
             Mat cleanMask = Mat::zeros(imagen.size(), CV_8UC1);
             
             if (maxAreaIdx >= 0) {
@@ -341,7 +513,7 @@ Mat defineOrgan(Mat imagen, bool isLung) {
             }
             
             imagen = cleanMask;
-            
+
         }
 
     } else {
@@ -352,7 +524,7 @@ Mat defineOrgan(Mat imagen, bool isLung) {
 }
 
 
-Mat mergeMasks(Mat &imgOriginal, Mat &maskLung, Mat &maskHearth, Mat &maskBones, float alpha = 0.3) {
+Mat mergeMasks(Mat &imgOriginal, Mat &maskLung, float alpha) {
     Mat imgColor;
 
     // Convertir a BGR si la original es gris
@@ -389,66 +561,11 @@ Mat mergeMasks(Mat &imgOriginal, Mat &maskLung, Mat &maskHearth, Mat &maskBones,
         }
     }
 
-
-
-    // Crear capa verde del mismo tamaño
-    Mat redLayer(imgOriginal.rows, imgOriginal.cols, CV_8UC3, Scalar(0, 0, 255));
-
-    // Aplicar overlay SOLO donde la máscara es 255
-    for (int i = 0; i < imgOriginal.rows; i++) {
-        for (int j = 0; j < imgOriginal.cols; j++) {
-
-            if (maskHearth.at<uchar>(i, j) == 255) {
-
-                // output = (1 - alpha) * original + alpha * green
-                output.at<Vec3b>(i, j)[0] =
-                    (1.0 - alpha) * imgColor.at<Vec3b>(i, j)[0] +
-                    alpha * redLayer.at<Vec3b>(i, j)[0];
-
-                output.at<Vec3b>(i, j)[1] =
-                    (1.0 - alpha) * imgColor.at<Vec3b>(i, j)[1] +
-                    alpha * redLayer.at<Vec3b>(i, j)[1];
-
-                output.at<Vec3b>(i, j)[2] =
-                    (1.0 - alpha) * imgColor.at<Vec3b>(i, j)[2] +
-                    alpha * redLayer.at<Vec3b>(i, j)[2];
-            }
-        }
-    }
-
-
-
-
-    // Crear capa verde del mismo tamaño
-    Mat blueLayer(imgOriginal.rows, imgOriginal.cols, CV_8UC3, Scalar(255, 0, 0));
-
-    // Aplicar overlay SOLO donde la máscara es 255
-    for (int i = 0; i < imgOriginal.rows; i++) {
-        for (int j = 0; j < imgOriginal.cols; j++) {
-
-            if (maskBones.at<uchar>(i, j) == 255) {
-
-                // output = (1 - alpha) * original + alpha * green
-                output.at<Vec3b>(i, j)[0] =
-                    (1.0 - alpha) * imgColor.at<Vec3b>(i, j)[0] +
-                    alpha * blueLayer.at<Vec3b>(i, j)[0];
-
-                output.at<Vec3b>(i, j)[1] =
-                    (1.0 - alpha) * imgColor.at<Vec3b>(i, j)[1] +
-                    alpha * blueLayer.at<Vec3b>(i, j)[1];
-
-                output.at<Vec3b>(i, j)[2] =
-                    (1.0 - alpha) * imgColor.at<Vec3b>(i, j)[2] +
-                    alpha * blueLayer.at<Vec3b>(i, j)[2];
-            }
-        }
-    }
-
     return output;
 }
 
 
-Mat mergeMasksHeart(Mat &imgOriginal, Mat &maskLung, float alpha = 0.3) {
+Mat mergeMasksHeart(Mat &imgOriginal, Mat &maskLung, float alpha ) {
     Mat imgColor;
 
     // Convertir a BGR si la original es gris
@@ -488,7 +605,7 @@ Mat mergeMasksHeart(Mat &imgOriginal, Mat &maskLung, float alpha = 0.3) {
     return output;
 }
 
-Mat mergeMasksBones(Mat &imgOriginal, Mat &maskBone, float alpha = 0.3) {
+Mat mergeMasksBones(Mat &imgOriginal, Mat &maskBone, float alpha ) {
     Mat imgColor;
 
     if (imgOriginal.channels() == 1)
@@ -522,110 +639,3 @@ Mat mergeMasksBones(Mat &imgOriginal, Mat &maskBone, float alpha = 0.3) {
 }
 
 
-
-
-int main() {
-    string folder = "L333";
-    auto files = getIMA(folder);
-
-    vector<Mat> imgs;
-    imgs.reserve(files.size());
-
-    for (auto& f : files) {
-        Mat m = readIMA(f);
-        if (m.empty()) m = Mat::zeros(256, 256, CV_8UC1);
-        imgs.push_back(m);
-    }
-
-    if (imgs.empty()) {
-        cout << "No se pudo cargar ninguna imagen\n";
-        return 1;
-    }
-    namedWindow("Controles", WINDOW_AUTOSIZE);
-
-
-    createTrackbar("Slice",    "Controles", &currentSlice, imgs.size() - 1);
-    //createTrackbar("KSize",    "Controles", &ksizeTrack, 50);  // límite arbitrario
-    
-    Mat panel(60, 300, CV_8UC3, Scalar(50, 50, 50));
-
-    ///// BOTONES  NOS SIRVEN PARA DARLE ACCIONES A LA APLICACIÓN DESDE OTRA VENTANA
-
-    setMouseCallback("Controles", onMouse);
-
-
-    // Con pruebas llegamos a la idea de que el BLUR aplicado solo sirve para los pulmones
-    // Los huesos se ven mucho mejor con la ecualización y luego BLUR, 
-    // Y el corazon se ve mejor con 
-
-    // Los pulmones se ven mucho mejor solo con apertura
-
-    /// para aislar los pulmonesel circulo usamos. slices 0-127
-    // circulo en 253,264
-    // RadioX de 210
-    // radioY de 247
-
-    // El corazon se ven mucho mejor solo con cierre
-
-    /// para aislar los pulmonesel circulo usamos. slices 0-42
-    // circulo en 284,215
-    // RadioX de 89
-    // radioY de 66
-
-
-    imshow("Controles", panel);
-    moveWindow("Controles", 0, 0);
-
-
-    namedWindow("Pulmones", WINDOW_AUTOSIZE);
-    namedWindow("CompletaPulmones", WINDOW_AUTOSIZE);
-    namedWindow("CorazonMascara", WINDOW_AUTOSIZE);
-    namedWindow("CompletaCorazon", WINDOW_AUTOSIZE); 
-    namedWindow("HuesosMascara", WINDOW_AUTOSIZE);
-    namedWindow("CompletaHuesos", WINDOW_AUTOSIZE); 
-
-
-    moveWindow("Pulmones", 300, 500);
-    moveWindow("CompletaPulmones", 300, 0);
-    moveWindow("CorazonMascara", 810, 500); 
-    moveWindow("CompletaCorazon", 810, 0); 
-    moveWindow("HuesosMascara", 1320, 500); 
-    moveWindow("CompletaHuesos", 1320, 0); 
-
-
-    while (true) {
-        Mat Original = imgs[currentSlice].clone();
-
-        // --- Procesamiento de Pulmones (como ya lo tenías) ---
-        Mat pulmonesMascara = imgs[currentSlice].clone();
-        pulmonesMascara = defineOrgan(pulmonesMascara, true); // Función que usa Apertura
-
-        Mat corazonMascara = imgs[currentSlice].clone();
-        corazonMascara = defineOrgan(corazonMascara, false);
-        Mat completaCorazon = mergeMasksHeart(Original, corazonMascara, 0.3); // Overlay rojo
-
-        imshow("CorazonMascara", corazonMascara); // Muestra solo la máscara del corazón
-        imshow("CompletaCorazon", completaCorazon); // Muestra la imagen original con el corazón resaltado
-
-        Mat huesosMascara = imgs[currentSlice].clone();
-        huesosMascara = defineBones(huesosMascara);
-        Mat completaHuesos = mergeMasksBones(Original, huesosMascara, 0.4); // Alpha un poco más alto para que brillen
-
-
-        Mat completaPulmones = mergeMasks(Original, pulmonesMascara, corazonMascara, huesosMascara, 0.3); // Overlay verde
-
-        imshow("Pulmones", pulmonesMascara);
-        imshow("CompletaPulmones", completaPulmones);
-
-
-
-        imshow("HuesosMascara", huesosMascara);
-        imshow("CompletaHuesos", completaHuesos);
-
-        int k = waitKey(30);
-        if (k == 27) break; 
-    }
-
-    destroyAllWindows(); // Cierra todas las ventanas al salir
-    return 0;
-}
