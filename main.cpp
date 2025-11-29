@@ -180,6 +180,8 @@ Button btn_result   = {50, 297, 147, 330};
 Button btn_comp     = {200, 297, 300, 330};
 Button btn_extra    = {359, 297, 460, 330};
 
+Button btn_pruebas    = {200, 345, 300, 375};
+
 bool inside(Button b, int x, int y) {
     return (x > b.x1 && x < b.x2 && y > b.y1 && y < b.y2);
 }
@@ -262,6 +264,15 @@ void onMouse(int event, int x, int y, int flags, void* userdata) {
             cout << "Botón: EXTRA\n";
         }
 
+        // ---- PRUEBAS ----
+        
+        else if (inside(btn_pruebas, x, y)) {
+            drawMask(img_click, btn_pruebas);
+            imshow("Aplicacion Principal", img_click);
+            waitKey(120);
+            cout << "Botón: PRUEBAS\n";
+        }
+
         // Restauramos la imagen normal después de la animación
         imshow("Aplicacion Principal", img_normal);
     }
@@ -275,7 +286,7 @@ int main() {
     img_normal = imread("img_normal.png");
     // img_menu_click = imread("img_click.png");
 
-    resize(img_normal,img_normal,cv::Size(500, 350));
+    resize(img_normal,img_normal,cv::Size(500, 395));
 
     // if (img_menu_normal.empty() || img_menu_click.empty()) {
     //     cout << "ADVERTENCIA: No se encontraron menu_normal.png o menu_click.png. Creando fondo negro." << endl;
