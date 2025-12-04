@@ -335,6 +335,7 @@ void drawMask(Mat &img, Button b) {
 }
 
 
+
 void encenderVentana(int boton){
     tiempo = 1;
     corazon = false;
@@ -447,104 +448,7 @@ Mat boneWindowing(Mat imagen, int minVal, int maxVal) {
     return salida;
 }
 
-// Mat defineBones(Mat imagen) {
-//     Mat procesada;
-//     procesada = boneWindowing(imagen, 120, 255);
-//     GaussianBlur(imagen, procesada, cv::Size(3, 3), 0);
-//     procesada = toClahe(procesada);
 
-//     // 1. UMBRALIZACIÓN 
-//     int t_strong = 170; 
-//     int t_weak = 158; 
-
-//     Mat fuerte, debil;
-//     cv::threshold(procesada, fuerte, t_strong, 255, cv::THRESH_BINARY);
-//     cv::threshold(procesada, debil, t_weak, 255, cv::THRESH_BINARY);
-
-//     // -------------------------------------------------------------
-//    //EROSIÓN 
-//     // -------------------------------------------------------------
-//     Mat kernelErosion = cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(3, 3));
-//     cv::erode(debil, debil, kernelErosion);
-//     // -------------------------------------------------------------
-
-//     Mat labels, stats, centroids;
-//     int nLabels = cv::connectedComponentsWithStats(debil, labels, stats, centroids);
-
-//     Mat mascaraBase = Mat::zeros(imagen.size(), CV_8UC1);
-
-//     // Filtro de área (INTACTO)
-//     int minArea = 25; 
-
-//     // --- PARÁMETROS DE LA ZONA DE MUERTE ---
-//     int zmX = 263;      
-//     int zmY = 210;      
-//     int zmRadio = 94;   
-//     int areaColumnaGigante = 10000; 
-
-//     // --- CONFIGURACIÓN DEL INTERVALO DE SLICES ---
-//     // La zona de muerte solo se activa en estos slices
-//     int inicioZonaMuerte = 245; 
-//     int finZonaMuerte = 438;
-//     // ---------------------------------------------
-
-//     for(int i = 1; i < nLabels; i++) {
-//         // Filtro básico de ruido
-//         if (stats.at<int>(i, cv::CC_STAT_AREA) < minArea) continue;
-
-//         Mat maskIsla = (labels == i);
-
-//         // Solo aplicamos esto si estamos en los slices del estómago
-//         if (currentSlice >= inicioZonaMuerte && currentSlice <= finZonaMuerte) {
-            
-//             double cX = centroids.at<double>(i, 0);
-//             double cY = centroids.at<double>(i, 1);
-
-//             // Distancia euclidiana al centro de la zona de muerte
-//             double dist = std::sqrt(std::pow(cX - zmX, 2) + std::pow(cY - zmY, 2));
-
-//             // Si el objeto está DENTRO del círculo de muerte
-//             if (dist < zmRadio) {
-//                 // Si NO es la columna gigante, lo matamos.
-//                 if (stats.at<int>(i, cv::CC_STAT_AREA) < areaColumnaGigante) {
-//                     continue; // Está en la zona prohibida y es pequeño -> BORRAR
-//                 }
-//             }
-//         }
-
-//         double minVal, maxVal;
-//         cv::minMaxLoc(imagen, &minVal, &maxVal, NULL, NULL, maskIsla);
-
-//         double umbralDureza = 180.0;
-
-//         if (maxVal < umbralDureza) {
-//             continue; // No tiene "corazón duro" -> BORRAR
-//         }
-//         // -------------------------------------------------------------
-
-//         cv::bitwise_or(mascaraBase, maskIsla, mascaraBase);
-//     }
-
-
-//     // --- RELLENO Y RESTAURACIÓN (INTACTO) ---
-//     Mat resultadoFinal = mascaraBase.clone();
-
-//     // Dilatación para recuperar lo erosionado
-//     cv::dilate(resultadoFinal, resultadoFinal, kernelErosion);
-
-//     // Cierre
-//     Mat kernelCierre = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(7, 7));
-//     cv::morphologyEx(resultadoFinal, resultadoFinal, cv::MORPH_CLOSE, kernelCierre);
-
-//     // Relleno final
-//     vector<vector<cv::Point>> contours;
-//     cv::findContours(resultadoFinal, contours, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE);
-//     for(size_t i = 0; i < contours.size(); i++) {
-//         cv::drawContours(resultadoFinal, contours, (int)i, Scalar(255), cv::FILLED);
-//     }
-    
-//     return resultadoFinal;
-// }
 Mat defineBones(Mat imagen) {
 
     imagen = maskCircle2(imagen, 253, 264, 210, 147);
@@ -772,6 +676,23 @@ Mat sumarMascaras(Mat *maskLung, Mat *maskHeart, Mat *maskBone)
     return finalMask;
 }
 
+double getMemoryUsageMB() {
+    ifstream file("/proc/self/status");
+    string line;
+    double result = 0;
+    while (getline(file, line)) {
+        if (line.substr(0, 6) == "VmRSS:") {
+            stringstream ss(line);
+            string temp;
+            long usageKB;
+            ss >> temp >> usageKB; // Saltamos "VmRSS:" y leemos el numero
+            result = usageKB / 1024.0;
+            break;
+        }
+    }
+    return result;
+}
+
 
 
 
@@ -808,7 +729,9 @@ int main() {
         if (m.empty()) m = Mat::zeros(256, 256, CV_8UC1);
         imgs.push_back(m);
     }  
-    
+
+        cout << "\n[INFO] Carga completada. RAM usada estimada: " << getMemoryUsageMB() << " MB" << endl;
+
     // createTrackbar("Slice", "Aplicacion Principal", &currentSlice, imgs.size() - 1);
 
     // VENTANAS
@@ -816,9 +739,29 @@ int main() {
         
         // MOSTRAMOS EL MENÚ, SIEMPRE ES VISIBLE
         
-        imshow("Aplicacion Principal", img_normal); //ESTA VENTANA YA TIENE LOS MENUS, ENTONCES, HACEMOS IF'S PARA CADA MENU
-        Mat original = imgs[currentSlice].clone();
+               Mat menuDisplay = img_normal.clone();
 
+        // 2. Obtener RAM actual
+        double currentRam = getMemoryUsageMB();
+        string ramText = "RAM: " + to_string((int)currentRam) + " MB";
+
+        // 3. Dibujar texto en la esquina inferior izquierda (amarillo con sombra negra)
+        putText(menuDisplay, ramText, cv::Point(10, 380), FONT_HERSHEY_SIMPLEX, 0.6, Scalar(0, 0, 0), 2);
+        putText(menuDisplay, ramText, cv::Point(10, 380), FONT_HERSHEY_SIMPLEX, 0.6, Scalar(0, 255, 255), 1);
+
+        // 4. Mostrar el menú modificado
+        imshow("Aplicacion Principal", menuDisplay);
+        
+        if (imgs.empty()) {
+            if (waitKey(30) == 27) break;
+            continue; 
+        }
+
+        // Validación de slice seguro
+        if (currentSlice < 0) currentSlice = 0;
+        if (currentSlice >= imgs.size()) currentSlice = imgs.size() - 1;
+
+        Mat original = imgs[currentSlice].clone();
         if(corazon){// PROCESO COMPLETO PARA OBTENER MASCARA DE CORAZON
             encenderCorazon(original);
 
@@ -909,6 +852,49 @@ Mat sendForDenoise(Mat img)
     curl_easy_cleanup(curl);
 
     return out;
+}
+
+void exportData(string organName) {
+    string filename = organName + "_estadisticas.csv";
+    cout << "\n[INFO] Iniciando exportacion de datos a: " << filename << "..." << endl;
+    
+    ofstream file(filename);
+    if(!file.is_open()) {
+        cout << "[ERROR] No se pudo crear el archivo csv." << endl;
+        return;
+    }
+       file << "Slice,Area_Total(px),Densidad_Media(HU_prox)\n";
+       int backupSlice = currentSlice;
+
+  for (size_t i = 0; i < imgs.size(); i++) {
+        // Actualizamos variable global para que los filtros funcionen bien (ej. zona muerte)
+        currentSlice = (int)i; 
+        
+        Mat original = imgs[i].clone();
+        Mat mask;
+
+        // Ejecutar la segmentación correspondiente
+        if (organName == "Huesos") {
+            mask = defineBones(original);
+        } else if (organName == "Corazon") {
+            mask = defineOrgan(original, false);
+        } else if (organName == "Pulmones") {
+            mask = defineOrgan(original, true);
+        }
+        int areaTotal = countNonZero(mask);
+        double meanVal = 0.0;
+        if (areaTotal > 0) {
+            Scalar m, s;
+            meanStdDev(original, m, s, mask);
+            meanVal = m[0];
+        }
+        file << i << "," << areaTotal << "," << meanVal << "\n";
+   
+        if (i % 10 == 0) cout << "Procesando slice " << i << "/" << imgs.size() << "\r" << flush;
+    }
+    currentSlice = backupSlice;
+    file.close();
+    cout << "\n[EXITO] Exportacion completada. Revisa la carpeta del proyecto." << endl;
 }
 
 
@@ -1023,11 +1009,15 @@ void encenderCorazon(Mat original){
     }
     
     Mat cierre2 = cleanMask;
+    Mat statsDisplay = roi.clone();
+    cvtColor(statsDisplay, statsDisplay, COLOR_GRAY2BGR);
+    visualizeStats(statsDisplay, cierre2, original); 
 
-
+     putText(statsDisplay, "[G] Generar Reporte CSV", cv::Point(10, 30), FONT_HERSHEY_SIMPLEX, 0.5, Scalar(0,255,0), 2);
+   
     imshow("Original", original);
     moveWindow("Original", 500,0);
-    imshow("Region de interés", roi);
+    imshow("Region de interés", statsDisplay);
     moveWindow("Region de interés", 500+(original.cols)*1,0);
     imshow("Umbralización", umbral);
     moveWindow("Umbralización", 500+(original.cols)*2,0);
@@ -1038,7 +1028,8 @@ void encenderCorazon(Mat original){
     imshow("Cierre2", cierre2);
     moveWindow("Cierre2", 500+(original.cols)*2,original.rows);
 
-
+    int ke = waitKey(120);
+    if (ke == 'g' || ke == 'G') exportData("Pulmones");
 }
 
 void encenderHueso(Mat original){
@@ -1065,11 +1056,15 @@ void encenderHueso(Mat original){
 
     Mat Cierre2 = fillHoles(maskFiltrada);
 
+    Mat statsDisplay = roi.clone();
+    cvtColor(statsDisplay, statsDisplay, COLOR_GRAY2BGR);
+    visualizeStats(statsDisplay, Cierre2, original); 
 
-
+     putText(statsDisplay, "[G] Generar Reporte CSV", cv::Point(10, 30), FONT_HERSHEY_SIMPLEX, 0.5, Scalar(0,255,0), 2);
+    
     imshow("Original", original);
     moveWindow("Original", 500+(original.cols)*0,0);
-    imshow("Region de interés", roi);
+    imshow("Region de interés", statsDisplay);
     moveWindow("Region de interés", 500+(original.cols)*1,0);
     imshow("Sharpening", sharp);
     moveWindow("Sharpening", 500+(original.cols)*2,0);
@@ -1082,7 +1077,8 @@ void encenderHueso(Mat original){
     imshow("Cierre2", Cierre2);
     moveWindow("Cierre2", 0,original.rows);
 
-    
+    int ke = waitKey(120);
+    if (ke == 'g' || ke == 'G') exportData("Huesos");
     
 
 }
@@ -1122,9 +1118,15 @@ void encenderPulmones( Mat original){
         apertura = roi;
     }
 
+     Mat statsDisplay = roi.clone();
+    cvtColor(statsDisplay, statsDisplay, COLOR_GRAY2BGR);
+    visualizeStats(statsDisplay, apertura, original);
+
+     putText(statsDisplay, "[G] Generar Reporte CSV", cv::Point(10, 30), FONT_HERSHEY_SIMPLEX, 0.5, Scalar(0,255,0), 2);
+   
     imshow("Original", original);
     moveWindow("Original", 500+(original.cols)*0,0);
-    imshow("Region de interés", roi);
+    imshow("Region de interés", statsDisplay);
     moveWindow("Region de interés", 500+(original.cols)*1,0);
     imshow("Blur Gaussiano", blur);
     moveWindow("Blur Gaussiano", 500+(original.cols)*2,0);
@@ -1133,7 +1135,9 @@ void encenderPulmones( Mat original){
     imshow("Apertura", apertura);
     moveWindow("Apertura", 500+(original.cols)*1,original.rows);
 
-    
+    // --- DETECTAR TECLA G ---
+    int ke = waitKey(120);
+    if (ke == 'g' || ke == 'G') exportData("Pulmones");
 
 }
 void encenderResults(Mat original){
@@ -1191,6 +1195,7 @@ void encenderComparativa(Mat original){
 
     waitKey(10); // muestra ventana temporal
 }
+
 
 
 
